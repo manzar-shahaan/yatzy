@@ -70,8 +70,9 @@ th, td {
 }
 
 .opponent-dice-selection, .my-dice-selection {
-    height: 30px;
-    width: 30px;
+    --pip: 0.75rem;
+    width: calc(var(--pip) * 5);
+    height: calc(var(--pip) * 5);
     border: 2px solid grey;
 }
 
