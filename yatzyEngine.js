@@ -2,15 +2,6 @@
 
 // Upper section: category name -> face value to sum (ones:1 ... sixes:6)
 const upperScoring = { ones: 1, twos: 2, threes: 3, fours: 4, fives: 5, sixes: 6 };
-// NOTE: commented out — these scorer functions don't exist yet, and the
-// ReferenceError at load time would crash the whole script. calculateScore
-// currently routes lower categories through combination() instead.
-// const lowerScoring = {
-//     onepair: scoreOnePair,
-//     twopairs: scoreTwoPairs,
-//     threeofakind: scoreThreeOfAKind,
-//     // ...
-// };
 
 
 function calculateScore(category, rolledDie) {
@@ -22,10 +13,6 @@ function calculateScore(category, rolledDie) {
     // not an upper category -> lower section; combination() scores all
     // combinations at once and we pick the requested one
     return combination(rolledDie)[category];
-}
-
-function isValidSelection(category, keptDie) {
-
 }
 
 function combination(rolledDie) {
@@ -53,15 +40,12 @@ function combination(rolledDie) {
     // Object.keys returns STRINGS ('3', not 3) — convert back to numbers
     const faces = Object.keys(counts).map(Number);
 
+    // "at least" reading: count >= N qualifies, highest qualifying face wins
     for (const face of faces) {
-        const freq = counts[face];
-        // "others <= 1": no other face may repeat for these to count
-        const othersOk = faces.every(f => f === face || counts[f] <= 1);
-
-        if (freq === 2 && othersOk) result.onepair = face * 2;
-        if (freq === 3 && othersOk) result.threeofakind = face * 3;
-        if (freq === 4 && othersOk) result.fourofakind = face * 4;
-        if (freq === 5) result.yatzy = 50;
+        if (counts[face] >= 2) result.onepair = Math.max(result.onepair, face * 2);
+        if (counts[face] >= 3) result.threeofakind = Math.max(result.threeofakind, face * 3);
+        if (counts[face] >= 4) result.fourofakind = Math.max(result.fourofakind, face * 4);
+        if (counts[face] === 5) result.yatzy = 50;
     }
 
     // two pairs ("at least" reading): every face with count >= 2 contributes

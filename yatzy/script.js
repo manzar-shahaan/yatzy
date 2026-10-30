@@ -38,7 +38,10 @@ async function startYatzy() {
     await loadContent(boardStart, 'board-main-content');
     document.querySelector('header').style.cssText = 'font-size: 3rem; max-height: 6rem';
     initRolledDie();
-    document.getElementById('roll-dice').addEventListener('click', renderDice);
+    game.startNewGame();
+    rollButton = document.getElementById('roll-dice');
+    rollButton.addEventListener('click', renderDice);
+    initScoreTableClicks();
     await loadDiceTemplate();
     firstKeptDice = document.getElementById("my-first-dice");
     secondKeptDice = document.getElementById("my-second-dice");
@@ -59,10 +62,12 @@ async function loadDiceTemplate() {
 }
 const rolledDie = [];
 const keptDie = [];
+let rollButton;
 
 async function renderDice() {
     const target = document.getElementById('dice-roll-render');
     if (!target || !diceTemplate) return;
+    if (!game.canRoll()) return;
     
     target.innerHTML = '';
     numOfKeptDie = keptDie.length;
@@ -84,6 +89,12 @@ async function renderDice() {
         target.appendChild(el);
     });
 
+    updatePreview();
+
+    game.recordRoll();
+    if (!game.canRoll()) {
+        rollButton.disabled = true; // 3 rolls used — must score now
+    }
 }
 
 function initRolledDie() {
@@ -135,4 +146,94 @@ function unkeepDice(dice) {
 
 function getSelectedDice() {
     return keptDie;
+}
+
+// --- score table preview ---
+const rowCategories = {
+    'Ones': 'ones',
+    'Twos': 'twos',
+    'Threes': 'threes',
+    'Fours': 'fours',
+    'Fives': 'fives',
+    'Sixes': 'sixes',
+    'One pair': 'onepair',
+    'Two pairs': 'twopairs',
+    'Three of a kind': 'threeofakind',
+    'Four of a kind': 'fourofakind',
+    'Full House': 'fullhouse',
+    'Small straight': 'smallstraight',
+    'Large straight': 'largestraight',
+    'Chance': 'chance',
+    'Yatzy': 'yatzy',
+};
+
+// game state (used categories, committed scores, roll count, totals)
+// lives in the yatzyGame instance in yatzyGame.js
+
+function updatePreview() {
+    const allDice = [...rolledDie, ...keptDie];
+    document.querySelectorAll('#score-table tr').forEach(row => {
+        const labelCell = row.cells[0];
+        if (!labelCell) return;
+        const category = rowCategories[labelCell.textContent.trim()];
+        if (!category || game.categoryUsed(category)) return;
+        row.cells[1].textContent = calculateScore(category, allDice);
+    });
+}
+
+function initScoreTableClicks() {
+    document.querySelectorAll('#score-table tr').forEach(row => {
+        const labelCell = row.cells[0];
+        if (!labelCell) return;
+        const category = rowCategories[labelCell.textContent.trim()];
+        if (!category) return;
+        row.cells[1].addEventListener('click', () => commitScore(category, row));
+    });
+}
+
+function commitScore(category, row) {
+    if (game.categoryUsed(category)) return; // already scored
+    if (!game.hasRolled()) return;           // must roll at least once first
+
+    const score = calculateScore(category, [...rolledDie, ...keptDie]);
+    game.endTurn(category, score);
+    row.cells[1].textContent = score;
+    row.style.opacity = 0.45; // mark category as used
+    updateTotals();
+    // clear stale previews on the still-unused rows
+    document.querySelectorAll('#score-table tr').forEach(other => {
+        const otherCategory = other.cells[0] && rowCategories[other.cells[0].textContent.trim()];
+        if (otherCategory && !game.categoryUsed(otherCategory)) {
+            other.cells[1].textContent = '';
+        }
+    });
+
+    // new turn: dice back in the pool, button live again (rolls reset in endTurn)
+    resetTurnDice();
+    if (rollButton) rollButton.disabled = false;
+}
+
+function updateTotals() {
+    const totals = game.getTotals();
+    setTotalCell('Sum', totals.upperSum);
+    setTotalCell('Bonus', totals.bonus);
+    setTotalCell('TOTAL', totals.total);
+}
+
+function setTotalCell(label, value) {
+    document.querySelectorAll('#score-table tr').forEach(row => {
+        if (row.cells[0] && row.cells[0].textContent.trim() === label) {
+            row.cells[1].textContent = value;
+        }
+    });
+}
+
+function resetTurnDice() {
+    keptDie.forEach(die => rolledDie.push(die));
+    keptDie.length = 0;
+    [firstKeptDice, secondKeptDice, thirdKeptDice, fourthKeptDice, fifthKeptDice].forEach(slot => {
+        if (slot) slot.innerHTML = '';
+    });
+    const target = document.getElementById('dice-roll-render');
+    if (target) target.innerHTML = '';
 }
